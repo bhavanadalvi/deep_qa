@@ -1,11 +1,11 @@
 {
-    "model_class": "VerbSemanticsModel",
+    "model_class": "VerbSemanticsBaseline1",
     "model_serialization_prefix": "/Users/bhavanad/knowledge_acquisition/data/deep_qa/aristo/dlfa/models/verb_semantics_model_test/",
     "seq2seq_encoder": {
         "default": {
             "type": "bi_gru",
             "encoder_params": {
-                "units": 100
+                "units": 20
             },
             "wrapper_params": {}
         }
@@ -13,17 +13,19 @@
     "num_stacked_rnns": 2,
     "patience": 3,
     "embeddings": {"words":
-                        {"dimension": 100,
-                            "pretrained_embeddings_file": "/Users/bhavanad/knowledge_acquisition/data/deep_qa/aristo/dlfa/glove/glove.6B.100d.txt.gz"
+                        {"dimension": 50,
+                          "fine_tune": false,
+                            "pretrained_embeddings_file": "/Users/bhavanad/knowledge_acquisition/data/deep_qa/aristo/dlfa/verb_semantics/data/pretrained_embeddings/glove.6B.100d.txt.gz"
                         },
                     "characters": {"dimension": 8}
                   },
-    "num_epochs": 200,
+    "num_epochs": 20,
     "optimizer": {
       "type": "adadelta",
       "learning_rate": 0.5
     },
+    "batch_size": 10000,
     "validation_metric": "val_loss",
-    "validation_files": ["/Users/bhavanad/knowledge_acquisition/data/deep_qa/aristo/dlfa/verb_semantics/data/train.tsv"],
-    "train_files": ["/Users/bhavanad/knowledge_acquisition/data/deep_qa/aristo/dlfa/verb_semantics/data/train.tsv"]
+    "train_files": ["/Users/bhavanad/knowledge_acquisition/data/deep_qa/aristo/dlfa/verb_semantics/data/scienceSentences.verbSemantics.All.run2.tsv"],
+    "validation_files": ["/Users/bhavanad/knowledge_acquisition/data/deep_qa/aristo/dlfa/verb_semantics/data/ProPara.TrainTest.run2.All.tsv"]
 }

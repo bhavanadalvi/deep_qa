@@ -140,7 +140,7 @@ class VerbSemanticsInstance(TextInstance):
         """
         fields = line.split("\t")
 
-        if len(fields) == 6:
+        if len(fields) >= 6:
             sentence_string, verb_string, entity_string, state_change_label, arg1_string, arg2_string = fields
             sentence = sentence_string.split("####")
             verb_parts = verb_string.split(",")
