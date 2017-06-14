@@ -3,18 +3,17 @@ import os
 from typing import Any, Dict, List, Tuple
 
 import numpy
-from keras.models import model_from_json
 from keras.callbacks import CallbackList, EarlyStopping, LambdaCallback, ModelCheckpoint
+from keras.models import model_from_json
 
-from ..training.callbacks import ReplicaModelCheckpoint
+from ..data.datasets import Dataset, IndexedDataset
 from ..common.checks import ConfigurationError
 from ..common.params import Params
-from ..data.dataset import Dataset, IndexedDataset
 from ..data.instances.instance import Instance
 from ..layers.wrappers import OutputMask
 from .models import DeepQaModel
 from .optimizers import optimizer_from_params
-from .multi_gpu import make_parallel
+from .multi_gpu import compile_parallel_model
 
 logger = logging.getLogger(__name__)  # pylint: disable=invalid-name
 
@@ -221,6 +220,7 @@ class Trainer:
 
     def load_data_arrays(self,
                          data_files: List[str],
+                         batch_size: int=None,
                          max_instances: int=None) -> Tuple[Dataset, numpy.array, numpy.array]:
         """
         Loads a :class:`Dataset` from a list of files, then converts it into numpy arrays for
@@ -237,6 +237,11 @@ class Trainer:
         data_files: List[str]
             The files to load.  These will get passed to ``self.load_dataset_from_files()``, which
             subclasses must implement.
+        batch_size: int, optional (default = None)
+            Optionally pass a specific batch size to load the data arrays with. If this is not
+            specified, we use the default self.batch_size attribute. This is a parameter so
+            you can specify different batch sizes for training vs validation, for instance, which
+            is useful if you are doing multi-gpu training.
         max_instances: int, optional (default=None)
             If not ``None``, we will restrict the dataset to only this many instances.  This is
             mostly useful for testing models out on subsets of your data.
@@ -252,6 +257,9 @@ class Trainer:
             An array or tuple of arrays suitable to be passed as outputs ``y`` to Keras'
             ``model.fit(x, y)`` or ``model.evaluate(x, y)`` methods
         """
+        if batch_size is None:
+            batch_size = self.batch_size
+
         logger.info("Loading data from %s", str(data_files))
         dataset = self.load_dataset_from_files(data_files)
         if max_instances is not None:
@@ -260,7 +268,7 @@ class Trainer:
         logger.info("Indexing dataset")
         indexing_kwargs = self._dataset_indexing_kwargs()
         indexed_dataset = dataset.to_indexed_dataset(**indexing_kwargs)
-        data_arrays = self.create_data_arrays(indexed_dataset)
+        data_arrays = self.create_data_arrays(indexed_dataset, batch_size)
         return (dataset, data_arrays)
 
     def train(self):
@@ -285,24 +293,33 @@ class Trainer:
         indexed_training_dataset = self.training_dataset.to_indexed_dataset(**indexing_kwargs)
         if self.update_model_state_with_training_data:
             self.set_model_state_from_indexed_dataset(indexed_training_dataset)
-        self.training_arrays = self.create_data_arrays(indexed_training_dataset)
+        self.training_arrays = self.create_data_arrays(indexed_training_dataset, self.batch_size)
         if self._uses_data_generators():
             self.train_steps_per_epoch = self.data_generator.last_num_batches  # pylint: disable=no-member
 
         if self.validation_files:
+            batch_size_for_validation = self.batch_size / self.num_gpus if self.num_gpus > 1 else None
             self.validation_dataset, self.validation_arrays = self.load_data_arrays(self.validation_files,
-                                                                                    self.max_validation_instances)
+                                                                                    self.max_validation_instances,
+                                                                                    batch_size_for_validation)
         if self._uses_data_generators():
             self.validation_steps = self.data_generator.last_num_batches  # pylint: disable=no-member
 
         # Then we build the model and compile it.
         logger.info("Building the model")
-        self.model = self._build_model()
-        if self.num_gpus > 1:
-            self.model = make_parallel(self.model, self.num_gpus)
+        if self.num_gpus <= 1:
+            self.model = self._build_model()
+            self.model.compile(self.__compile_kwargs())
+        else:
+            if self._uses_data_generators():
+                if self.data_generator.adaptive_batch_sizes:   # pylint: disable=no-member
+                    raise ConfigurationError("Multi-gpu training is currently only supported for "
+                                             "training which does not utilise adaptive batching."
+                                             "Please remove 'adaptive_batch_sizes'from your "
+                                             "configuration file to proceed.")
+            self.model = compile_parallel_model(self._build_model, self.__compile_kwargs())
 
         self.model.summary(show_masks=self.show_summary_with_masking)
-        self.model.compile(self.__compile_kwargs())
 
         if self.debug_params:
             # Get the list of layers whose outputs will be visualized as per the
@@ -338,6 +355,7 @@ class Trainer:
         # Add the user-specified arguments to fit.
         kwargs.update(self.fit_kwargs)
         # We now pass all the arguments to the model's fit function, which does all of the training.
+
         if not self._uses_data_generators():
             history = self.model.fit(self.training_arrays[0], self.training_arrays[1], **kwargs)
         else:
@@ -399,6 +417,8 @@ class Trainer:
         for idx, metric in enumerate(self.model.metrics_names):
             print("{}: {}".format(metric, scores[idx]))
 
+
+
     ##################
     # Abstract methods - you MUST override these
     ##################
@@ -455,7 +475,8 @@ class Trainer:
         """
         raise NotImplementedError
 
-    def create_data_arrays(self, dataset: IndexedDataset) -> Tuple[numpy.array, numpy.array]:
+    def create_data_arrays(self, dataset: IndexedDataset,
+                           batch_size: int=None) -> Tuple[numpy.array, numpy.array]:
         """
         Takes a raw dataset and converts it into training inputs and labels that can be used to
         either train a model or make predictions.  Depending on parameters passed to the
@@ -467,6 +488,9 @@ class Trainer:
         dataset: Dataset
             A ``Dataset`` of the same format as read by ``load_dataset_from_files()`` (we will
             call this directly with the output from that method, in fact)
+        batch_size: int, optional (default = None)
+            The batch size with which the dataset should be created. If this is None,
+            the default self.batch_size will be used.
 
         Returns
         -------
@@ -481,7 +505,9 @@ class Trainer:
     def _build_model(self) -> DeepQaModel:
         """Constructs and returns a DeepQaModel (which is a wrapper around a Keras Model) that will
         take the output of self._get_training_data as input, and produce as output a true/false
-        decision for each input.
+        decision for each input. Note that in the multiple gpu case, this function will be
+        called multiple times for the different GPUs. As such, you should be wary of this function
+        having side effects unrelated to building a computation graph.
 
         The returned model will be used to call model.fit(train_input, train_labels).
         """
@@ -534,11 +560,9 @@ class Trainer:
         # Some witchcraft is happening here - we don't specify the epoch replacement variable
         # checkpointing string, because Keras does that within the callback if we specify it here.
         if self.save_models:
-
-            checkpoint_callback = ReplicaModelCheckpoint if self.num_gpus > 1 else ModelCheckpoint
-            checkpointing = checkpoint_callback(self.model_prefix + "_weights_epoch={epoch:d}.h5",
-                                                save_best_only=True, save_weights_only=True,
-                                                monitor=self.validation_metric)
+            checkpointing = ModelCheckpoint(self.model_prefix + "_weights_epoch={epoch:d}.h5",
+                                            save_best_only=True, save_weights_only=True,
+                                            monitor=self.validation_metric)
             callbacks.append(checkpointing)
 
         return CallbackList(callbacks)
@@ -607,11 +631,7 @@ class Trainer:
         Called after training. If you have some auxiliary object, such as an object storing
         the vocabulary of your model, you can save it here. The model config is saved by default.
         """
-        if self.num_gpus > 1:
-            num_lambda_layers = len(self.model.outputs)
-            model_config = self.model.layers[-(num_lambda_layers + 1)].to_json()
-        else:
-            model_config = self.model.to_json()
+        model_config = self.model.to_json()
         model_config_file = open("%s_config.json" % (self.model_prefix), "w")
         print(model_config, file=model_config_file)
         model_config_file.close()
@@ -720,4 +740,5 @@ class Trainer:
                 'loss': self.loss,
                 'optimizer': self.optimizer,
                 'metrics': self.metrics,
+                'num_gpus': self.num_gpus
                 })

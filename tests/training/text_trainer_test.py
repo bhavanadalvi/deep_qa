@@ -5,6 +5,7 @@ import numpy
 
 from deep_qa.common.params import Params, pop_choice
 from deep_qa.layers.encoders import encoders
+from deep_qa.data.datasets import Dataset, SnliDataset
 from deep_qa.models.text_classification import ClassificationModel
 from deep_qa.models.multiple_choice_qa import QuestionAnswerSimilarity
 from ..common.test_case import DeepQaTestCase
@@ -70,7 +71,7 @@ class TestTextTrainer(DeepQaTestCase):
 
     @mock.patch.object(QuestionAnswerSimilarity, '_output_debug_info')
     def test_words_and_characters_works_with_matrices(self, _output_debug_info):
-        self.write_question_answer_memory_network_files()
+        self.write_question_answer_files()
         args = Params({
                 'embeddings': {'words': {'dimension': 2}, 'characters': {'dimension': 2}},
                 'tokenizer': {'type': 'words and characters'},
@@ -165,8 +166,33 @@ class TestTextTrainer(DeepQaTestCase):
         self.write_true_false_model_files()
         self.write_pretrained_vector_files()
         args = Params({
-                'embeddings': {'words': {'dimension': 8, 'pretrained_file': self.PRETRAINED_VECTORS_GZIP},
-                               'characters': {'dimension': 8}},
+                'embeddings': {
+                        'words': {
+                                'dimension': 8,
+                                'pretrained_file': self.PRETRAINED_VECTORS_GZIP,
+                                'project': True
+                        },
+                        'characters': {'dimension': 8}},
                 })
         model = self.get_model(ClassificationModel, args)
         model.train()
+
+    def test_reading_two_datasets_return_identical_types(self):
+
+        self.write_true_false_model_files()
+        model = self.get_model(ClassificationModel)
+        train_dataset = model.load_dataset_from_files([self.TRAIN_FILE])
+        validation_dataset = model.load_dataset_from_files([self.VALIDATION_FILE])
+
+        assert isinstance(train_dataset, Dataset)
+        assert isinstance(validation_dataset, Dataset)
+
+    def test_reading_two_non_default_datasets_return_identical_types(self):
+
+        self.write_original_snli_data()
+        model = self.get_model(ClassificationModel, {"dataset": {"type": "snli"}})
+        train_dataset = model.load_dataset_from_files([self.TRAIN_FILE])
+        validation_dataset = model.load_dataset_from_files([self.TRAIN_FILE])
+
+        assert isinstance(train_dataset, SnliDataset)
+        assert isinstance(validation_dataset, SnliDataset)

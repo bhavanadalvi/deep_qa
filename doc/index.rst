@@ -53,6 +53,7 @@ This library has several main components:
    training/about_trainers
    training/trainer
    training/text_trainer
+   training/multi_gpu
    training/misc
 
 .. toctree::
@@ -70,6 +71,7 @@ This library has several main components:
    data/wrappers
    data/tokenizers
    data/data_generator
+   data/datasets
    data/general_data_utils
 
 .. toctree::
@@ -78,7 +80,6 @@ This library has several main components:
 
    models/about_models
    models/entailment
-   models/memory_networks
    models/multiple_choice_qa
    models/sentence_selection
    models/reading_comprehension
