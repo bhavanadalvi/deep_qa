@@ -50,7 +50,6 @@ class VerbSemanticsBaseline2(TextTrainer):
         entity_input = Input(shape=self._get_sentence_shape(), dtype='float32', name='entity_array_input')
 
         bow_features = BOWEncoder()
-        concat_layer = Concatenate()
 
         # shape: (batch_size, text_length, embedding_dim)
         sentence_embedding = self._embed_input(sentence_input)
@@ -64,7 +63,6 @@ class VerbSemanticsBaseline2(TextTrainer):
         # merged_sentence_vector = concat_layer([verb_input, entity_input, sentence_embedding])
         merged_sentence_vector = VectorMatrixMerge(
             concat_axis=-1, # last dimension
-            mask_concat_axis=-1,
             name='merge_sentence_verb_entity')(
             [verb_input, entity_input, sentence_embedding])
 
@@ -88,7 +86,6 @@ class VerbSemanticsBaseline2(TextTrainer):
         # For state-change-type prediction: We first convert verb and entity into bag-of-words(BOW) representation
         # and then apply a dense layer with soft-max activation to predict state change type.
 
-        average_layer = Average()
         averaged_sentence_vector = bow_features(merged_sentence_vector)
         print("averaged_sentence_vector ++++++++", averaged_sentence_vector)
 
@@ -119,4 +116,6 @@ class VerbSemanticsBaseline2(TextTrainer):
         # If we use any custom layers implemented in deep_qa (not part of original Keras),
         # they need to be added in the custom_objects dictionary.
         custom_objects["BOWEncoder"] = BOWEncoder
+        custom_objects["VectorMatrixMerge"] = VectorMatrixMerge
+
         return custom_objects

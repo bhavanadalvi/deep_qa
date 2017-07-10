@@ -358,6 +358,7 @@ class Trainer:
 
         if not self._uses_data_generators():
             history = self.model.fit(self.training_arrays[0], self.training_arrays[1], **kwargs)
+            #self.evaluate_model_output_predictions(self.validation_arrays[0], self.max_test_instances)
         else:
             # If the data was produced by a generator, we have a bit more work to do to get the
             # arguments right.
@@ -402,6 +403,20 @@ class Trainer:
         self._set_params_from_model()
         self.model.compile(self.__compile_kwargs())
         self.update_model_state_with_training_data = False
+
+    def evaluate_model_output_predictions(self, data_arrays, max_instances: int=None):
+        # We call self.load_model() first, to be sure that we load the best model we have, if we've
+        # trained for a while.
+        val_predictions_file = open(self.validation_predictions_path, "w+")
+        print("Bhavana data input: ", len(data_arrays[0]))
+        model_predictions = self.model.predict(data_arrays)
+        print("model predictions: ", model_predictions)
+
+        #for model_prediction in model_predictions:
+        for one_datapoint in model_predictions[0]:
+            print(str(one_datapoint) + "\n", file=val_predictions_file)
+
+        val_predictions_file.close()
 
     def evaluate_model(self, data_files: List[str], max_instances: int=None):
         # We call self.load_model() first, to be sure that we load the best model we have, if we've

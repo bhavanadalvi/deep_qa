@@ -1,4 +1,4 @@
-from deep_qa.models.sequence_tagging import VerbSemanticsModel
+from deep_qa.models.sequence_tagging import VerbSemanticsBaseline1
 from deep_qa.common.params import Params
 from ...common.test_case import DeepQaTestCase
 
@@ -16,4 +16,4 @@ class TestVerbSemanticsModel(DeepQaTestCase):
                 'validation_metric': 'val_loss',
                 })
 
-        self.ensure_model_trains_and_loads(VerbSemanticsModel, args)
+        self.ensure_model_trains_and_loads(VerbSemanticsBaseline1, args)

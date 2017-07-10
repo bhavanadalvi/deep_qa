@@ -80,7 +80,9 @@ class VerbSemanticsBaseline1(TextTrainer):
         #state_change_type = Dense(self.data_indexer.get_vocab_size("state_changes") - 2,
         #                          activation='softmax', name="state_change")(concat_verb_entity_vector)
 
-        verb_entity_sentence_vector = concatenation_layer([concat_verb_entity_vector, bow_features(sentence_embedding)])
+        #verb_entity_sentence_vector = concatenation_layer([concat_verb_entity_vector, bow_features(sentence_embedding)])
+        verb_entity_sentence_vector = concat_verb_entity_vector
+
         state_change_type = Dense(self.data_indexer.get_vocab_size("state_changes") - 2,
                                   activation='softmax', name="state_change")(verb_entity_sentence_vector)
 

@@ -1,6 +1,7 @@
 {
-    "model_class": "VerbSemanticsBaseline1",
-    "model_serialization_prefix": "/Users/bhavanad/knowledge_acquisition/data/deep_qa/aristo/dlfa/models/verb_semantics_model_test/",
+    "model_class": "VerbSemanticsBaseline2",
+    "model_serialization_prefix": "/Users/bhavanad/knowledge_acquisition/data/deep_qa/aristo/dlfa/models/",
+
     "seq2seq_encoder": {
         "default": {
             "type": "bi_gru",
@@ -13,19 +14,20 @@
     "num_stacked_rnns": 2,
     "patience": 3,
     "embeddings": {"words":
-                        {"dimension": 50,
-                          "fine_tune": false,
-                            "pretrained_embeddings_file": "/Users/bhavanad/knowledge_acquisition/data/deep_qa/aristo/dlfa/verb_semantics/data/pretrained_embeddings/glove.6B.100d.txt.gz"
+                        {"fine_tune": false,
+                          "pretrained_file": "/Users/bhavanad/knowledge_acquisition/data/deep_qa/aristo/dlfa/verb_semantics/data/pretrained_embeddings/glove.6B.100d.txt.gz"
                         },
                     "characters": {"dimension": 8}
                   },
-    "num_epochs": 20,
+    "num_epochs": 200,
     "optimizer": {
       "type": "adadelta",
       "learning_rate": 0.5
     },
-    "batch_size": 10000,
+    "batch_size": 256,
+     "loss": "categorical_crossentropy",
     "validation_metric": "val_loss",
-    "train_files": ["/Users/bhavanad/knowledge_acquisition/data/deep_qa/aristo/dlfa/verb_semantics/data/scienceSentences.verbSemantics.All.run2.tsv"],
-    "validation_files": ["/Users/bhavanad/knowledge_acquisition/data/deep_qa/aristo/dlfa/verb_semantics/data/ProPara.TrainTest.run2.All.tsv"]
+    "train_files": ["/Users/bhavanad/knowledge_acquisition/data/deep_qa/aristo/dlfa/verb_semantics/data/scienceSentences.verbSemantics.train.run5.tsv"],
+    "validation_files": ["/Users/bhavanad/knowledge_acquisition/data/deep_qa/aristo/dlfa/verb_semantics/data/ProPara.TrainTest.run5.All.tsv"],
+    "validation_predictions_path": "/Users/bhavanad/knowledge_acquisition/data/deep_qa/aristo/dlfa/verb_semantics/data/temp.predictions.tsv"
 }

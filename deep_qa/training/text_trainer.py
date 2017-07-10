@@ -145,6 +145,7 @@ class TextTrainer(Trainer):
         self.seq2seq_encoder_fallback_behavior = params.pop_choice('seq2seq_encoder_fallback_behavior',
                                                                    fallback_choices,
                                                                    default_to_first_choice=True)
+        self.validation_predictions_path = params.pop('validation_predictions_path', None)
 
         super(TextTrainer, self).__init__(params)
 

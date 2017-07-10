@@ -1,4 +1,5 @@
-from keras.layers import Dense, Input, TimeDistributed, Multiply, Average, Concatenate
+from keras.layers import Dense, Input, TimeDistributed, Multiply, Average, Concatenate, Lambda
+import keras.backend as K
 from overrides import overrides
 
 from deep_qa.common.params import Params
@@ -9,6 +10,7 @@ from deep_qa.layers.attention import WeightedSum
 from deep_qa.layers.encoders.bag_of_words import BOWEncoder
 from deep_qa.layers import VectorMatrixMerge
 from deep_qa.layers.attention import Attention
+
 
 class VerbSemanticsModelAttention(TextTrainer):
     """
@@ -86,7 +88,12 @@ class VerbSemanticsModelAttention(TextTrainer):
         print("averaged_sentence_vector ++++++++", averaged_sentence_vector)
 
         concatenation_layer = Concatenate()
-        concat_verb_entity_vector = concatenation_layer([bow_features(verb_embedding), bow_features(entity_embedding)])
+        lambda_layer = Lambda(lambda x: K.cast(K.expand_dims(x, -1), K.floatx()))
+
+        verb_embedding2 = multiply_layer([sentence_embedding, lambda_layer(verb_input)])
+        entity_embedding2 = multiply_layer([sentence_embedding, lambda_layer(entity_input)])
+
+        concat_verb_entity_vector = concatenation_layer([bow_features(verb_embedding2), bow_features(entity_embedding2)])
         print("sentence_embedding ++++++++", sentence_embedding)
         print("concat_verb_entity_vector ++++++++", concat_verb_entity_vector)
 
